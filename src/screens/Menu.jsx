@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { categories, formatPrice, homeTiles, products, promos } from '../data.js';
 import Logo from '../components/Logo.jsx';
+import { tr } from '../menuI18n.js';
 import ProductModal from '../components/ProductModal.jsx';
+import MealWizard from '../components/MealWizard.jsx';
 import { FooterButtons, ScanBox } from '../components/Footer.jsx';
 
 const grid = {
@@ -20,13 +22,18 @@ export default function Menu({ t, lang, go, count, subtotal, addToCart, ...rest 
   const [toast, setToast] = useState(null);
   const [flyer, setFlyer] = useState(null);
 
-  const openProduct = (id) => setSelected(products.find((p) => p.id === id));
+  const [wizard, setWizard] = useState(null);
+
+  // Zestaw → pełnoekranowy kreator, pojedynczy produkt → okno produktu
+  const open = (p) => (p.meal ? setWizard({ product: p }) : setSelected(p));
+  const openProduct = (id) => open(products.find((p) => p.id === id));
 
   const handleAdd = (line) => {
     addToCart(line);
     setSelected(null);
+    setWizard(null);
     setFlyer({ key: Date.now(), emoji: line.product.emoji });
-    setToast({ key: Date.now(), text: `${line.qty}× ${line.product.name}` });
+    setToast({ key: Date.now(), text: `${line.qty}× ${tr(line.product.name, lang)}` });
     setTimeout(() => setToast(null), 2200);
   };
 
@@ -89,8 +96,8 @@ export default function Menu({ t, lang, go, count, subtotal, addToCart, ...rest 
                       onClick={() => openProduct(p.productId)}
                     >
                       <div className="promo-text">
-                        <b>{p.title}</b>
-                        <span>{p.sub}</span>
+                        <b>{tr(p.title, lang)}</b>
+                        <span>{tr(p.sub, lang)}</span>
                       </div>
                       <motion.span className="promo-emoji" whileHover={{ rotate: 8, scale: 1.1 }}>{p.emoji}</motion.span>
                     </motion.button>
@@ -107,11 +114,11 @@ export default function Menu({ t, lang, go, count, subtotal, addToCart, ...rest 
                       variants={item}
                       className="product-card"
                       whileTap={{ scale: 0.94 }}
-                      onClick={() => setSelected(p)}
+                      onClick={() => open(p)}
                     >
-                      {p.badge && <span className="badge">{p.badge}</span>}
+                      {p.badge && <span className="badge">{tr(p.badge, lang)}</span>}
                       <div className="pc-img" style={{ background: p.bg }}>{p.emoji}</div>
-                      <div className="pc-name">{p.name}</div>
+                      <div className="pc-name">{tr(p.name, lang)}</div>
                       <div className="pc-price">{formatPrice(p.price)}</div>
                     </motion.button>
                   ))}
@@ -189,7 +196,27 @@ export default function Menu({ t, lang, go, count, subtotal, addToCart, ...rest 
 
       <AnimatePresence>
         {selected && (
-          <ProductModal product={selected} t={t} lang={lang} onClose={() => setSelected(null)} onAdd={handleAdd} />
+          <ProductModal
+            product={selected}
+            t={t}
+            lang={lang}
+            onClose={() => setSelected(null)}
+            onAdd={handleAdd}
+            onMakeMeal={(prefill) => { setWizard({ product: selected, prefill }); setSelected(null); }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {wizard && (
+          <MealWizard
+            product={wizard.product}
+            prefill={wizard.prefill}
+            t={t}
+            lang={lang}
+            onClose={() => setWizard(null)}
+            onAdd={handleAdd}
+          />
         )}
       </AnimatePresence>
     </div>
