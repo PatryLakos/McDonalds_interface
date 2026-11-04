@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { extras, formatPrice, mealDrinks, mealSizes } from '../data.js';
+import { MEAL_SAVING, MEAL_UPGRADE, canCustomize, canMakeMeal, extras, formatPrice } from '../data.js';
 import QtyStepper from './QtyStepper.jsx';
+import CustomizeChips from './CustomizeChips.jsx';
+import { tr, lineDetails } from '../menuI18n.js';
 
 const collapse = {
   initial: { height: 0, opacity: 0 },
@@ -10,27 +12,26 @@ const collapse = {
   transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
 };
 
-export default function ProductModal({ product, t, lang, onClose, onAdd }) {
-  const [qty, setQty] = useState(1);
+// Okno pojedynczego produktu. Zestawy obsługuje MealWizard.
+// `initial` = istniejąca pozycja koszyka → tryb edycji.
+// `onMakeMeal(prefill)` = klient wybrał propozycję zestawu → otwieramy kreator z jego ustawieniami.
+export default function ProductModal({ product, t, lang, onClose, onAdd, onMakeMeal, initial }) {
+  const cfg = initial?.config;
+  const editing = Boolean(initial);
+  const [qty, setQty] = useState(initial?.qty ?? 1);
   const [info, setInfo] = useState(false);
-  const [custom, setCustom] = useState(false);
-  const [removed, setRemoved] = useState([]);
-  const [added, setAdded] = useState([]);
-  const [size, setSize] = useState(mealSizes[0]);
-  const [drink, setDrink] = useState(mealDrinks[0]);
+  const [custom, setCustom] = useState(editing);
+  const [removed, setRemoved] = useState(cfg?.removed ?? []);
+  const [added, setAdded] = useState(cfg?.added ?? []);
 
-  const canCustomize = !product.meal && product.ingredients.length > 1;
+  const customizable = canCustomize(product);
+  const upsell = canMakeMeal(product) && onMakeMeal;
   const extrasPrice = extras.filter((e) => added.includes(e.id)).reduce((s, e) => s + e.price, 0);
-  const unitPrice = product.price + (product.meal ? size.extra : 0) + extrasPrice;
-
-  const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  const unitPrice = product.price + extrasPrice;
 
   const submit = () => {
-    const details = [];
-    if (product.meal) details.push(`${size.name[lang]}`, drink);
-    removed.forEach((r) => details.push(`${t('without')}: ${r}`));
-    extras.filter((e) => added.includes(e.id)).forEach((e) => details.push(`+ ${e.name}`));
-    onAdd({ product, qty, unitPrice, details });
+    const config = { removed, added };
+    onAdd({ product, qty, unitPrice, details: lineDetails({ product, config }, lang, t), config });
   };
 
   return (
@@ -46,10 +47,7 @@ export default function ProductModal({ product, t, lang, onClose, onAdd }) {
         <button className="close-x" onClick={onClose}>✕</button>
 
         <div className="pm-scroll">
-          <motion.div
-            className="pm-image"
-            style={{ background: product.bg }}
-          >
+          <motion.div className="pm-image" style={{ background: product.bg }}>
             <motion.span
               initial={{ scale: 0.4, rotate: -20 }}
               animate={{ scale: 1, rotate: 0 }}
@@ -59,7 +57,7 @@ export default function ProductModal({ product, t, lang, onClose, onAdd }) {
             </motion.span>
           </motion.div>
 
-          <h2 className="pm-name">{product.name}</h2>
+          <h2 className="pm-name">{tr(product.name, lang)}</h2>
           <div className="pm-price">{formatPrice(unitPrice)}</div>
 
           <button className="btn-outline sm center" onClick={() => setInfo(!info)}>{t('nutrition')}</button>
@@ -69,37 +67,38 @@ export default function ProductModal({ product, t, lang, onClose, onAdd }) {
                 <div className="pm-info-inner">
                   <div className="kcal"><b>{product.kcal}</b> kcal</div>
                   {product.ingredients.length > 0 && (
-                    <p><b>{t('ingredients')}:</b> {product.ingredients.join(', ')}</p>
+                    <p><b>{t('ingredients')}:</b> {product.ingredients.map((i) => tr(i, lang)).join(', ')}</p>
                   )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {product.meal && (
-            <div className="pm-section">
-              <h4>{t('size')}</h4>
-              <div className="chip-row">
-                {mealSizes.map((s) => (
-                  <button key={s.id} className={`chip ${size.id === s.id ? 'on' : ''}`} onClick={() => setSize(s)}>
-                    {s.name[lang]} {s.extra > 0 && <small>+{formatPrice(s.extra)}</small>}
-                    {size.id === s.id && <motion.span layoutId="size-check" className="chip-check">✓</motion.span>}
-                  </button>
-                ))}
-              </div>
-              <h4>{t('drink')}</h4>
-              <div className="chip-row wrap">
-                {mealDrinks.map((d) => (
-                  <button key={d} className={`chip ${drink === d ? 'on' : ''}`} onClick={() => setDrink(d)}>
-                    🥤 {d}
-                    {drink === d && <motion.span layoutId="drink-check" className="chip-check">✓</motion.span>}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {upsell && (
+            <motion.button
+              className="meal-upsell"
+              onClick={() => onMakeMeal({ removed, added, qty })}
+              initial={{ opacity: 0, y: 30, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1, transition: { delay: 0.25, type: 'spring', stiffness: 240, damping: 20 } }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <span className="mu-art">
+                <motion.span animate={{ rotate: [-6, 6, -6] }} transition={{ repeat: Infinity, duration: 2.4 }}>🍟</motion.span>
+                <span>🥤</span>
+              </span>
+              <span className="mu-text">
+                <b>{t('makeMeal')}</b>
+                <span>{t('makeMealSub')}</span>
+                <small>{t('youSave')} {formatPrice(MEAL_SAVING)}</small>
+              </span>
+              <span className="mu-cta">
+                <b>+{formatPrice(MEAL_UPGRADE)}</b>
+                <span className="mu-btn">{t('makeMealYes')}</span>
+              </span>
+            </motion.button>
           )}
 
-          {canCustomize && (
+          {customizable && (
             <>
               <button className={`btn-outline wide ${custom ? 'active' : ''}`} onClick={() => setCustom(!custom)}>
                 {custom ? t('personalizeDone') : t('personalize')}
@@ -107,32 +106,7 @@ export default function ProductModal({ product, t, lang, onClose, onAdd }) {
               <AnimatePresence initial={false}>
                 {custom && (
                   <motion.div className="pm-custom" {...collapse}>
-                    <div className="pm-section">
-                      <h4>{t('without')}</h4>
-                      <div className="chip-row wrap">
-                        {product.ingredients.map((ing) => (
-                          <button
-                            key={ing}
-                            className={`chip ${removed.includes(ing) ? 'off' : ''}`}
-                            onClick={() => toggle(removed, setRemoved, ing)}
-                          >
-                            {removed.includes(ing) ? '✕ ' : ''}{ing}
-                          </button>
-                        ))}
-                      </div>
-                      <h4>{t('extra')}</h4>
-                      <div className="chip-row wrap">
-                        {extras.map((e) => (
-                          <button
-                            key={e.id}
-                            className={`chip ${added.includes(e.id) ? 'on' : ''}`}
-                            onClick={() => toggle(added, setAdded, e.id)}
-                          >
-                            + {e.name} <small>{formatPrice(e.price)}</small>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <CustomizeChips product={product} removed={removed} setRemoved={setRemoved} added={added} setAdded={setAdded} t={t} lang={lang} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -145,7 +119,7 @@ export default function ProductModal({ product, t, lang, onClose, onAdd }) {
         <div className="pm-actions">
           <button className="btn-outline flat" onClick={onClose}>{t('cancel')}</button>
           <motion.button className="btn-yellow flat" whileTap={{ scale: 0.96 }} onClick={submit}>
-            {t('addToOrder')} · {formatPrice(unitPrice * qty)}
+            {editing ? t('saveChanges') : t('addToOrder')} · {formatPrice(unitPrice * qty)}
           </motion.button>
         </div>
       </motion.div>

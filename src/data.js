@@ -1,16 +1,16 @@
 // Menu kiosku. Ceny w złotówkach, obrazki jako emoji (łatwo podmienić na pliki .png w polu `img`).
 
 export const categories = [
-  { id: 'new', emoji: '✨', name: { pl: 'Co nowego?', en: "What's new?", de: 'Neu' } },
-  { id: 'meals', emoji: '🍱', name: { pl: 'McZestawy', en: 'Meals', de: 'Menüs' } },
-  { id: 'burgers', emoji: '🍔', name: { pl: 'Burgery', en: 'Burgers', de: 'Burger' } },
-  { id: 'wraps', emoji: '🌯', name: { pl: 'McWrapy i Sałatki', en: 'Wraps & Salads', de: 'Wraps & Salate' } },
-  { id: 'chicken', emoji: '🍗', name: { pl: 'Kurczaki', en: 'Chicken', de: 'Hähnchen' } },
-  { id: 'sides', emoji: '🍟', name: { pl: 'Frytki i Dodatki', en: 'Fries & Sides', de: 'Pommes & Beilagen' } },
-  { id: 'cafe', emoji: '☕', name: { pl: 'McCafé®', en: 'McCafé®', de: 'McCafé®' } },
-  { id: 'desserts', emoji: '🍦', name: { pl: 'Lody i Desery', en: 'Desserts', de: 'Desserts' } },
-  { id: 'drinks', emoji: '🥤', name: { pl: 'Napoje', en: 'Drinks', de: 'Getränke' } },
-  { id: 'family', emoji: '🎁', name: { pl: 'Happy Meal®', en: 'Happy Meal®', de: 'Happy Meal®' } },
+  { id: 'new', emoji: '✨', name: { pl: 'Co nowego?', en: "What's new?", uk: 'Новинки' } },
+  { id: 'meals', emoji: '🍱', name: { pl: 'McZestawy', en: 'Meals', uk: 'Набори' } },
+  { id: 'burgers', emoji: '🍔', name: { pl: 'Burgery', en: 'Burgers', uk: 'Бургери' } },
+  { id: 'wraps', emoji: '🌯', name: { pl: 'McWrapy i Sałatki', en: 'Wraps & Salads', uk: 'Роли та салати' } },
+  { id: 'chicken', emoji: '🍗', name: { pl: 'Kurczaki', en: 'Chicken', uk: 'Курка' } },
+  { id: 'sides', emoji: '🍟', name: { pl: 'Frytki i Dodatki', en: 'Fries & Sides', uk: 'Картопля фрі та гарніри' } },
+  { id: 'cafe', emoji: '☕', name: { pl: 'McCafé®', en: 'McCafé®', uk: 'McCafé®' } },
+  { id: 'desserts', emoji: '🍦', name: { pl: 'Lody i Desery', en: 'Desserts', uk: 'Десерти' } },
+  { id: 'drinks', emoji: '🥤', name: { pl: 'Napoje', en: 'Drinks', uk: 'Напої' } },
+  { id: 'family', emoji: '🎁', name: { pl: 'Happy Meal®', en: 'Happy Meal®', uk: 'Happy Meal®' } },
 ];
 
 const BURGER_ING = ['Bułka', 'Sałata', 'Ser', 'Ogórek', 'Cebula', 'Ketchup', 'Musztarda'];
@@ -18,15 +18,15 @@ const BURGER_ING = ['Bułka', 'Sałata', 'Ser', 'Ogórek', 'Cebula', 'Ketchup', 
 export const products = [
   // Co nowego
   { id: 'mccrispy-h', cat: 'new', name: 'McCrispy® Halloween', price: 26.9, emoji: '🍔', bg: '#2b1d1d', kcal: 720, ingredients: ['Bułka z czarnym sezamem', 'Kurczak w panierce', 'Bekon', 'Ser cheddar', 'Sos dyniowy'], badge: 'NOWOŚĆ' },
-  { id: 'strips', cat: 'new', name: 'McCrispy® Strips 3 szt.', price: 18.5, emoji: '🍗', bg: '#fff1d6', kcal: 410, ingredients: ['Polędwiczki z kurczaka', 'Panierka'], badge: 'NOWOŚĆ' },
+  { id: 'strips', cat: 'new', name: 'McCrispy® Strips 3 szt.', price: 18.5, emoji: '🍗', bg: '#fff1d6', kcal: 410, ingredients: ['Polędwiczki z kurczaka', 'Panierka'], badge: 'NOWOŚĆ', noCustom: true },
   { id: 'veggie', cat: 'new', name: 'McVeggie Deluxe', price: 22.9, emoji: '🥬', bg: '#e8f6c9', kcal: 540, ingredients: ['Bułka', 'Kotlet roślinny', 'Sałata', 'Pomidor', 'Sos majonezowy'] },
   { id: 'piernik', cat: 'new', name: 'Piernikowa Latte', price: 14.9, emoji: '☕', bg: '#f4e2cf', kcal: 290, ingredients: ['Espresso', 'Mleko', 'Syrop piernikowy', 'Bita śmietana'], badge: 'LIMITOWANA' },
 
   // Zestawy
-  { id: 'bigmac-set', cat: 'meals', name: 'McZestaw Big Mac®', price: 32.9, emoji: '🍔', bg: '#ffe9a8', kcal: 1080, meal: true, ingredients: ['Big Mac®', 'Frytki', 'Napój'] },
-  { id: 'mccrispy-set', cat: 'meals', name: 'McZestaw McCrispy®', price: 33.9, emoji: '🍗', bg: '#ffe9a8', kcal: 1120, meal: true, ingredients: ['McCrispy®', 'Frytki', 'Napój'] },
-  { id: 'wiesmac-set', cat: 'meals', name: 'McZestaw WieśMac®', price: 35.9, emoji: '🍔', bg: '#ffe9a8', kcal: 1240, meal: true, ingredients: ['WieśMac®', 'Frytki', 'Napój'] },
-  { id: 'nuggets-set', cat: 'meals', name: 'McZestaw Chikker 9 szt.', price: 31.5, emoji: '🍗', bg: '#ffe9a8', kcal: 980, meal: true, ingredients: ['9 nuggetsów', 'Frytki', 'Napój', 'Sos'] },
+  { id: 'bigmac-set', cat: 'meals', name: 'McZestaw Big Mac®', price: 32.9, emoji: '🍔', bg: '#ffe9a8', kcal: 1080, meal: true, main: 'bigmac', ingredients: ['Big Mac®', 'Frytki', 'Napój'] },
+  { id: 'mccrispy-set', cat: 'meals', name: 'McZestaw McCrispy®', price: 33.9, emoji: '🍗', bg: '#ffe9a8', kcal: 1120, meal: true, main: 'mccrispy', ingredients: ['McCrispy®', 'Frytki', 'Napój'] },
+  { id: 'wiesmac-set', cat: 'meals', name: 'McZestaw WieśMac®', price: 35.9, emoji: '🍔', bg: '#ffe9a8', kcal: 1240, meal: true, main: 'wiesmac', ingredients: ['WieśMac®', 'Frytki', 'Napój'] },
+  { id: 'nuggets-set', cat: 'meals', name: 'McZestaw Chikker 9 szt.', price: 31.5, emoji: '🍗', bg: '#ffe9a8', kcal: 980, meal: true, main: 'nuggets9', ingredients: ['9 nuggetsów', 'Frytki', 'Napój', 'Sos'] },
 
   // Burgery
   { id: 'bigmac', cat: 'burgers', name: 'Big Mac®', price: 21.9, emoji: '🍔', bg: '#fff3cf', kcal: 495, ingredients: ['Bułka z sezamem', '2 kotlety wołowe', 'Sos Big Mac', 'Sałata', 'Ser', 'Ogórek', 'Cebula'] },
@@ -42,9 +42,9 @@ export const products = [
   { id: 'salad', cat: 'wraps', name: 'Sałatka z kurczakiem', price: 22.5, emoji: '🥗', bg: '#eaf5dd', kcal: 310, ingredients: ['Mix sałat', 'Kurczak', 'Pomidorki', 'Ogórek', 'Dressing'] },
 
   // Kurczaki
-  { id: 'nuggets6', cat: 'chicken', name: 'Chikker 6 szt.', price: 15.9, emoji: '🍗', bg: '#fff1d6', kcal: 260, ingredients: ['Kurczak', 'Panierka'] },
-  { id: 'nuggets9', cat: 'chicken', name: 'Chikker 9 szt.', price: 20.9, emoji: '🍗', bg: '#fff1d6', kcal: 390, ingredients: ['Kurczak', 'Panierka'] },
-  { id: 'nuggets20', cat: 'chicken', name: 'Chikker 20 szt.', price: 39.9, emoji: '🍗', bg: '#fff1d6', kcal: 870, ingredients: ['Kurczak', 'Panierka'] },
+  { id: 'nuggets6', cat: 'chicken', name: 'Chikker 6 szt.', price: 15.9, emoji: '🍗', bg: '#fff1d6', kcal: 260, ingredients: ['Kurczak', 'Panierka'], noCustom: true },
+  { id: 'nuggets9', cat: 'chicken', name: 'Chikker 9 szt.', price: 20.9, emoji: '🍗', bg: '#fff1d6', kcal: 390, ingredients: ['Kurczak', 'Panierka'], noCustom: true },
+  { id: 'nuggets20', cat: 'chicken', name: 'Chikker 20 szt.', price: 39.9, emoji: '🍗', bg: '#fff1d6', kcal: 870, ingredients: ['Kurczak', 'Panierka'], noCustom: true },
   { id: 'chickenburger', cat: 'chicken', name: 'Chikker Burger', price: 8.9, emoji: '🍔', bg: '#fff1d6', kcal: 340, ingredients: ['Bułka', 'Kurczak', 'Sałata', 'Sos'] },
 
   // Dodatki
@@ -79,9 +79,39 @@ export const products = [
 
 // Opcje zestawów
 export const mealSizes = [
-  { id: 'm', name: { pl: 'Średni', en: 'Medium', de: 'Mittel' }, extra: 0 },
-  { id: 'l', name: { pl: 'Duży', en: 'Large', de: 'Groß' }, extra: 2.5 },
+  { id: 'm', name: { pl: 'Średni', en: 'Medium', uk: 'Середній' }, extra: 0 },
+  { id: 'l', name: { pl: 'Duży', en: 'Large', uk: 'Великий' }, extra: 2.5 },
 ];
+// Propozycja zestawu: dopłata za średnie frytki + napój do kanapki, wrapa lub kurczaka
+export const MEAL_UPGRADE = 11.0;
+const MEAL_ALONE_PRICE = 9.9 + 8.9; // frytki średnie + Coca-Cola 0,4 l osobno
+export const MEAL_SAVING = Math.round((MEAL_ALONE_PRICE - MEAL_UPGRADE) * 100) / 100;
+const NO_MEAL = ['salad', 'piernik'];
+export const canMakeMeal = (p) => !p.meal && ['new', 'burgers', 'wraps', 'chicken'].includes(p.cat) && !NO_MEAL.includes(p.id);
+
+// Czy produkt można personalizować (usuwać składniki / dodawać dodatki)
+export const canCustomize = (p) => !p.meal && !p.noCustom && p.ingredients.length > 1;
+
+// Dodatek w zestawie (krok 2 kreatora)
+export const mealSides = [
+  { id: 'fries', name: 'Frytki', emoji: '🍟', bg: '#ffe3e0', extra: 0 },
+  { id: 'salad', name: 'Mała sałatka', emoji: '🥗', bg: '#eaf5dd', extra: 0 },
+  { id: 'wedges', name: 'Ziemniaczki z ziołami', emoji: '🥔', bg: '#fff1d6', extra: 2.0 },
+  { id: 'carrots', name: 'Marchewki', emoji: '🥕', bg: '#ffe9d1', extra: 0 },
+];
+
+// Napoje w zestawie (krok 3 kreatora)
+export const mealDrinkItems = [
+  { id: 'Coca-Cola', emoji: '🥤', bg: '#ffe0e0', extra: 0 },
+  { id: 'Coca-Cola Zero', emoji: '🥤', bg: '#2b2b2b', extra: 0, dark: true },
+  { id: 'Fanta', emoji: '🍊', bg: '#ffe7c7', extra: 0 },
+  { id: 'Sprite', emoji: '🍋', bg: '#e3f7d9', extra: 0 },
+  { id: 'Woda', emoji: '💧', bg: '#e1f1ff', extra: 0 },
+  { id: 'Lipton Ice Tea', emoji: '🧋', bg: '#fff3cf', extra: 0 },
+  { id: 'Sok pomarańczowy', emoji: '🧃', bg: '#ffecc2', extra: 1.0 },
+  { id: 'Kawa mrożona', emoji: '🧊', bg: '#f4e2cf', extra: 3.0 },
+];
+
 export const mealDrinks = ['Coca-Cola', 'Coca-Cola Zero', 'Fanta', 'Sprite', 'Woda', 'Lipton Ice Tea'];
 
 export const extras = [
@@ -92,10 +122,10 @@ export const extras = [
 
 // Kafle na ekranie głównym menu
 export const homeTiles = [
-  { cat: 'new', title: { pl: 'Co nowego?', en: "What's new?", de: 'Was ist neu?' }, emoji: '🍔', bg: 'linear-gradient(135deg,#fff 0%,#fff4d1 100%)' },
-  { cat: 'meals', title: { pl: 'McZestawy', en: 'Meals', de: 'Menüs' }, emoji: '🍟', bg: 'linear-gradient(135deg,#fff 0%,#ffe1dd 100%)' },
-  { cat: 'cafe', title: { pl: 'McCafé®', en: 'McCafé®', de: 'McCafé®' }, emoji: '☕', bg: 'linear-gradient(135deg,#fff 0%,#f3e3d2 100%)' },
-  { cat: 'family', title: { pl: 'Odkryj oferty Family', en: 'Family offers', de: 'Family Angebote' }, emoji: '🎁', bg: 'linear-gradient(135deg,#fff 0%,#ffd9d9 100%)', red: true },
+  { cat: 'new', title: { pl: 'Co nowego?', en: "What's new?", uk: 'Що нового?' }, emoji: '🍔', bg: 'linear-gradient(135deg,#fff 0%,#fff4d1 100%)' },
+  { cat: 'meals', title: { pl: 'McZestawy', en: 'Meals', uk: 'Набори' }, emoji: '🍟', bg: 'linear-gradient(135deg,#fff 0%,#ffe1dd 100%)' },
+  { cat: 'cafe', title: { pl: 'McCafé®', en: 'McCafé®', uk: 'McCafé®' }, emoji: '☕', bg: 'linear-gradient(135deg,#fff 0%,#f3e3d2 100%)' },
+  { cat: 'family', title: { pl: 'Odkryj oferty Family', en: 'Family offers', uk: 'Сімейні пропозиції' }, emoji: '🎁', bg: 'linear-gradient(135deg,#fff 0%,#ffd9d9 100%)', red: true },
 ];
 
 export const promos = [

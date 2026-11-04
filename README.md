@@ -20,5 +20,5 @@ Po 60 s bezczynności pojawia się okno „Potrzebujesz więcej czasu?”.
 Przycisk „Dostępność” przesuwa interfejs w dół ekranu.
 
 ## Edycja menu
-Produkty, ceny i kategorie: `src/data.js`. Teksty (PL/EN/DE): `src/i18n.js`.
+Produkty, ceny i kategorie: `src/data.js`. Teksty (PL/EN/UK): `src/i18n.js`.
 Obrazki są emoji – możesz je zamienić na zdjęcia (np. `<img>` w `Menu.jsx` / `ProductModal.jsx`).

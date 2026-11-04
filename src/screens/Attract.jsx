@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { attractSlides } from '../data.js';
 import { LANGS } from '../i18n.js';
+import { tr } from '../menuI18n.js';
 import Logo from '../components/Logo.jsx';
 
 export default function Attract({ t, lang, setLang, go, a11y, setA11y }) {
@@ -37,10 +38,10 @@ export default function Attract({ t, lang, setLang, go, a11y, setA11y }) {
               {slide.emoji}
             </motion.div>
             <motion.h1 initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3, duration: 0.7 }}>
-              {slide.title}
+              {tr(slide.title, lang)}
             </motion.h1>
             <motion.p initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5, duration: 0.7 }}>
-              {slide.sub}
+              {tr(slide.sub, lang)}
             </motion.p>
           </motion.div>
         </AnimatePresence>
@@ -76,7 +77,7 @@ export default function Attract({ t, lang, setLang, go, a11y, setA11y }) {
           <div className="attract-small">
             <button className="btn-outline" onClick={() => setLangOpen(!langOpen)}>
               <span className="ico">文A</span>
-              <span><small>{t('languages')}</small><br /><b>EN DE</b></span>
+              <span><small>{t('languages')}</small><br /><b>EN UA</b></span>
             </button>
             <button className={`btn-outline ${a11y ? 'active' : ''}`} onClick={() => setA11y(!a11y)}>♿ {t('a11y')}</button>
           </div>

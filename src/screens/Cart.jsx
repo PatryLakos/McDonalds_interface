@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { formatPrice } from '../data.js';
+import { canCustomize, canMakeMeal, formatPrice } from '../data.js';
 import QtyStepper from '../components/QtyStepper.jsx';
+import ProductModal from '../components/ProductModal.jsx';
+import MealWizard from '../components/MealWizard.jsx';
+import { tr, lineDetails } from '../menuI18n.js';
 import { FooterButtons, ScanBox } from '../components/Footer.jsx';
 
-export default function Cart({ t, go, cart, updateQty, subtotal, total, donation, setDonation, ...rest }) {
+export default function Cart({ t, go, cart, updateQty, replaceLine, subtotal, total, donation, setDonation, ...rest }) {
   const [open, setOpen] = useState({});
+  const [editing, setEditing] = useState(null);
+
+  // Zestawy edytujemy w kreatorze, pojedyncze produkty w oknie produktu
+  const isMealLine = (line) => line.product.meal || line.config?.asMeal;
+  const canEdit = (line) => isMealLine(line) || canCustomize(line.product) || canMakeMeal(line.product);
+  const startEdit = (line) => setEditing({ line, meal: isMealLine(line) });
 
   const roundUp = Math.round((Math.ceil(subtotal) - subtotal) * 100) / 100;
   const donations = [
@@ -39,16 +48,21 @@ export default function Cart({ t, go, cart, updateQty, subtotal, total, donation
             >
               <div className="cl-img" style={{ background: line.product.bg }}>{line.product.emoji}</div>
               <div className="cl-info">
-                <div className="cl-name">{line.product.name}</div>
-                {line.details.length > 0 && (
-                  <button className="btn-outline xs" onClick={() => setOpen({ ...open, [line.uid]: !open[line.uid] })}>
-                    {open[line.uid] ? t('hideDetails') : t('showDetails')}
-                  </button>
-                )}
+                <div className="cl-name">{tr(line.product.name, rest.lang)}{line.config?.asMeal && <span className="meal-tag">🍟🥤 {t('mealOn').split(':')[0]}</span>}</div>
+                <div className="cl-btns">
+                  {canEdit(line) && (
+                    <button className="btn-outline xs" onClick={() => startEdit(line)}>✎ {t('personalize')}</button>
+                  )}
+                  {lineDetails(line, rest.lang, t).length > 0 && (
+                    <button className="btn-outline xs" onClick={() => setOpen({ ...open, [line.uid]: !open[line.uid] })}>
+                      {open[line.uid] ? t('hideDetails') : t('showDetails')}
+                    </button>
+                  )}
+                </div>
                 <AnimatePresence initial={false}>
                   {open[line.uid] && (
                     <motion.ul className="cl-details" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
-                      {line.details.map((d) => <li key={d}>{d}</li>)}
+                      {lineDetails(line, rest.lang, t).map((d) => <li key={d}>{d}</li>)}
                     </motion.ul>
                   )}
                 </AnimatePresence>
@@ -102,6 +116,33 @@ export default function Cart({ t, go, cart, updateQty, subtotal, total, donation
           <FooterButtons t={t} {...rest} />
         </div>
       </div>
+
+      <AnimatePresence>
+        {editing && !editing.meal && (
+          <ProductModal
+            key={editing.line.uid}
+            product={editing.line.product}
+            initial={editing.line}
+            t={t}
+            lang={rest.lang}
+            onClose={() => setEditing(null)}
+            onMakeMeal={(prefill) => setEditing({ ...editing, meal: true, prefill })}
+            onAdd={(item) => { replaceLine(editing.line.uid, item); setEditing(null); }}
+          />
+        )}
+        {editing?.meal && (
+          <MealWizard
+            key={`wz-${editing.line.uid}`}
+            product={editing.line.product}
+            initial={editing.prefill ? undefined : editing.line}
+            prefill={editing.prefill}
+            t={t}
+            lang={rest.lang}
+            onClose={() => setEditing(null)}
+            onAdd={(item) => { replaceLine(editing.line.uid, item); setEditing(null); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

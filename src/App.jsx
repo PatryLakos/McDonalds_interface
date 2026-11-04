@@ -68,6 +68,7 @@ export default function App() {
   }, [bump]);
 
   const addToCart = (item) => setCart((c) => [...c, { ...item, uid: crypto.randomUUID() }]);
+  const replaceLine = (uid, item) => setCart((c) => c.map((i) => (i.uid === uid ? { ...item, uid } : i)));
   const updateQty = (uid, qty) =>
     setCart((c) => (qty <= 0 ? c.filter((i) => i.uid !== uid) : c.map((i) => (i.uid === uid ? { ...i, qty } : i))));
 
@@ -91,6 +92,7 @@ export default function App() {
         {...shared}
         cart={cart}
         updateQty={updateQty}
+        replaceLine={replaceLine}
         subtotal={subtotal}
         total={total}
         donation={donation}
