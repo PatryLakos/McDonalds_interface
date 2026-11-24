@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import AdminSetup from './admin/AdminSetup.jsx';
 import { configure, shutdown } from './logger.js';
+// Czcionka dołączona lokalnie (bez internetu) — stałe wymiary przycisków i współrzędne AOI w każdej sesji
+import '@fontsource/poppins/400.css';
+import '@fontsource/poppins/500.css';
+import '@fontsource/poppins/600.css';
+import '@fontsource/poppins/700.css';
+import '@fontsource/poppins/800.css';
 import './styles.css';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

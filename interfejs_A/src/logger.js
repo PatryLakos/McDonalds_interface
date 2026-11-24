@@ -273,6 +273,9 @@ function onPointerDown(e) {
 // ---------- scenariusze ----------
 export function startScenario(n, opis = '') {
   if (active) endScenario({ sukces: 0, opis: `przerwano=start_S${n}` });
+  // AOI ekranu, który jeszcze kończy animację wejścia, należą do okresu przed scenariuszem —
+  // zgłaszamy je teraz, zanim zmieni się numer scenariusza i t0 (inaczej dostałyby S{n} i ujemny czas_ms)
+  completeSettle();
   scenario = `S${n}`;
   nextScenario = n + 1;
   active = true;
