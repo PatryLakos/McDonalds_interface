@@ -122,3 +122,22 @@ export function lineDetails(line, lang, t) {
   extras.filter((e) => c.added.includes(e.id)).forEach((e) => d.push(`+ ${tr(e.name, lang)}`));
   return d.filter(Boolean);
 }
+
+// Podsumowanie zamówienia (B): skład zestawu w jednym wierszu, np. „Rozmiar zestawu: Duży · Frytki · Coca-Cola”
+export function mealInfo(line, lang, t) {
+  const c = line.config;
+  if (!c || !(line.product.meal || c.asMeal)) return '';
+  const size = mealSizes.find((x) => x.id === c.sizeId)?.name[lang];
+  const side = mealSides.find((x) => x.id === c.side);
+  return [`${t('size')}: ${size}`, side && tr(side.name, lang), c.drink && tr(c.drink, lang)].filter(Boolean).join(' · ');
+}
+
+// Podsumowanie zamówienia (B): zmiany składników, każda osobno, żeby można je było cofać pojedynczo
+export function lineChanges(line, lang, t) {
+  const c = line.config;
+  if (!c) return [];
+  return [
+    ...c.removed.map((r) => ({ kind: 'removed', id: r, label: t('without'), text: tr(r, lang), price: 0 })),
+    ...extras.filter((e) => c.added.includes(e.id)).map((e) => ({ kind: 'added', id: e.id, label: t('addedExtra'), text: tr(e.name, lang), price: e.price })),
+  ];
+}

@@ -220,6 +220,8 @@ export default function App() {
         total={total}
         donation={donation}
         setDonation={setDonation}
+        dine={dine}
+        setDine={setDine}
       />
     ),
     payment: <Payment {...shared} total={total} onPaid={finishOrder} />,

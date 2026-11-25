@@ -20,6 +20,14 @@ const STEP_SUMMARY = 3;
 
 const STEP_SCREENS = ['zestaw_kanapka', 'zestaw_dodatek', 'zestaw_napoj', 'zestaw_podsumowanie'];
 
+// Szybki zestaw (B): frytki + Coca-Cola w rozmiarze średnim albo dużym — te same wybory co w krokach 2 i 3
+const QUICK_SIDE = mealSides.find((s) => s.id === 'fries');
+const QUICK_DRINK = mealDrinkItems.find((d) => d.id === 'Coca-Cola');
+const QUICK = [
+  { sizeId: 'm', title: 'quickM', inc: 'quickMInc' },
+  { sizeId: 'l', title: 'quickL', inc: 'quickLInc' },
+];
+
 const slide = {
   enter: (dir) => ({ x: dir > 0 ? 260 : -260, opacity: 0 }),
   center: { x: 0, opacity: 1 },
@@ -56,9 +64,28 @@ export default function MealWizard({ product, initial, prefill, t, lang, onClose
   const steps = [main.noCustom ? t('stepMainAlt') : t('stepMain'), t('stepSide'), t('stepDrink'), t('stepSummary')];
   useEffect(() => {
     const q = [customizable ? t('wantCustomize') : t('mainReady'), t('chooseSide'), t('drink'), t('mealSummary')][step];
-    say(`${t('mealWord')} ${title}. ${t('step')} ${step + 1} ${t('of')} 4: ${steps[step]}. ${q}`);
+    const quickHint = step === STEP_MAIN && !editing ? ` ${t('quickHelp')}` : '';
+    say(`${t('mealWord')} ${title}. ${t('step')} ${step + 1} ${t('of')} 4: ${steps[step]}. ${q}${quickHint}`);
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
   const canNext = step === STEP_MAIN || (step === STEP_SIDE && side) || (step === STEP_DRINK && drink);
+
+  // Wybrany szybki zestaw wynika z bieżących wyborów, więc kroki 2–4 pokazują to samo
+  const quickSize = side?.id === QUICK_SIDE.id && drink?.id === QUICK_DRINK.id ? size.id : null;
+  const showQuick = step === STEP_MAIN && !editing;
+  const quickReady = showQuick && quickSize;
+  const quickPrice = (sizeId) => basePrice + mealSizes.find((s) => s.id === sizeId).extra + QUICK_SIDE.extra + QUICK_DRINK.extra + extrasPrice;
+  const pickQuick = (q) => {
+    hideErr();
+    if (quickSize === q.sizeId) {
+      setSide(null);
+      setDrink(null);
+      return;
+    }
+    setSize(mealSizes.find((s) => s.id === q.sizeId));
+    setSide(QUICK_SIDE);
+    setDrink(QUICK_DRINK);
+    say(`${t(q.title)}: ${t(q.inc)}. ${formatPrice(quickPrice(q.sizeId) * qty)}`);
+  };
   // Z kroku wyboru wracamy do podsumowania, jeśli klient już raz tam był
   const [seenSummary, setSeenSummary] = useState(editing);
 
@@ -131,7 +158,7 @@ export default function MealWizard({ product, initial, prefill, t, lang, onClose
             {step === STEP_MAIN && (
               <>
                 <motion.div
-                  className="wz-hero"
+                  className={`wz-hero ${showQuick ? 'sm' : ''}`}
                   style={{ background: main.bg }}
                   initial={{ scale: 0.6, rotate: -12 }}
                   animate={{ scale: 1, rotate: 0 }}
@@ -144,7 +171,8 @@ export default function MealWizard({ product, initial, prefill, t, lang, onClose
                   <>
                     <p className="wz-q">{t('wantCustomize')}</p>
                     <div className="wz-choice">
-                      <button data-log="personalizacja_nie" className={`wz-opt ${!custom ? 'on' : ''}`} onClick={() => { setCustom(false); setRemoved([]); setAdded([]); next(); }}>
+                      {/* Pod pytaniem są gotowe zestawy, więc „Nie, dziękuję” tylko zaznacza wybór zamiast przechodzić dalej */}
+                      <button data-log="personalizacja_nie" className={`wz-opt ${!custom ? 'on' : ''}`} onClick={() => { setCustom(false); setRemoved([]); setAdded([]); if (!showQuick) next(); }}>
                         <span>👍</span>{t('noThanks')}
                       </button>
                       <button data-log="personalizacja_tak" className={`wz-opt ${custom ? 'on' : ''}`} onClick={() => setCustom(true)}>
@@ -166,6 +194,31 @@ export default function MealWizard({ product, initial, prefill, t, lang, onClose
                   </>
                 ) : (
                   <p className="wz-q">{t('mainReady')}</p>
+                )}
+                {showQuick && (
+                  <section className="wz-quick" aria-label={t('quickTitle')}>
+                    <h3>{t('quickTitle')}</h3>
+                    <p>{t('quickSub')}</p>
+                    <div className="wz-choice" role="radiogroup" aria-label={t('quickTitle')}>
+                      {QUICK.map((q) => (
+                        <button
+                          key={q.sizeId}
+                          role="radio"
+                          aria-checked={quickSize === q.sizeId}
+                          data-log={`szybki_zestaw_${q.sizeId}`}
+                          className={`wz-opt ${quickSize === q.sizeId ? 'on' : ''}`}
+                          onClick={() => pickQuick(q)}
+                        >
+                          {quickSize === q.sizeId && <span className="wz-check" aria-hidden>✓</span>}
+                          <span className={`wz-quick-art ${q.sizeId}`} aria-hidden>{QUICK_SIDE.emoji}{QUICK_DRINK.emoji}</span>
+                          <b>{t(q.title)}</b>
+                          <small>{t(q.inc)}</small>
+                          <strong>{formatPrice(quickPrice(q.sizeId))}</strong>
+                        </button>
+                      ))}
+                    </div>
+                    <button className="btn-outline sm" data-log="krok_po_kroku" onClick={next}>{t('quickOther')} →</button>
+                  </section>
                 )}
               </>
             )}
@@ -231,7 +284,11 @@ export default function MealWizard({ product, initial, prefill, t, lang, onClose
         <motion.div key={unitPrice * qty} className="wz-price" initial={{ scale: 1.15, color: '#d88a00' }} animate={{ scale: 1, color: '#1a1a1a' }}>
           {formatPrice(unitPrice * qty)}
         </motion.div>
-        {step < STEP_SUMMARY ? (
+        {quickReady ? (
+          <motion.button className="btn-yellow lg" data-aoi="AOI_cel" data-log="dodaj_szybki_zestaw" whileTap={{ scale: 0.96 }} onClick={submit}>
+            {t('addToOrder')}
+          </motion.button>
+        ) : step < STEP_SUMMARY ? (
           <motion.button className="btn-yellow lg" data-aoi="AOI_cel" data-log="dalej" aria-disabled={!canNext} whileTap={{ scale: 0.96 }}
             onClick={() => (canNext ? next() : showErr('BRAK_WYBORU', step === STEP_SIDE ? t('errPickSide') : t('errPickDrink')))}>
             {t('next')} →
