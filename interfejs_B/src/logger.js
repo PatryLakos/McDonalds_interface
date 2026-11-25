@@ -1,20 +1,20 @@
 // Moduł rejestrowania zdarzeń do badania — format i słownik: PUN_slownik_zmiennych.csv (plik PUN_zdarzenia).
 //
-// • Jeden plik na uczestnika i wersję: zdarzenia/PUN_zdarzenia_I{interfejs}_{uczestnik}_{wersja}.csv
-//   (UTF-8 z BOM, separator średnik). Kolejne scenariusze S1, S2, S3 dopisują się do tego samego pliku.
-// • Dane uczestnika wpisuje prowadzący w panelu przed uruchomieniem kiosku (src/admin/AdminSetup.jsx → configure()).
-//   Do tego czasu nic nie jest rejestrowane. Ctrl+Shift+A wraca do panelu (shutdown()).
+// • Jeden plik na uczestnika i scenariusz: zdarzenia/PUN_zdarzenia_I06_P{numer}_B_S{1–3}.csv
+//   (UTF-8 z BOM, separator średnik). Kolejność plików: P01_S1, P01_S2, P01_S3, P02_S1, …
+// • Przy wczytaniu kiosku serwer Vite sprawdza folder zdarzenia/ i podaje następny plik (startSession()).
+//   Plik powstaje dopiero przy starcie scenariusza — odświeżenie strony bez scenariusza nie zużywa numeru.
+//   Wiersze sprzed startu (sesja, ekran startowy, ekran po poprzednim scenariuszu) trafiają do pliku
+//   scenariusza, który zaczyna się po nich.
 // • Scenariusz zaczyna się:
-//     – klawiszem prowadzącego 1, 2 lub 3 (start S1/S2/S3; kiosk wraca na ekran startowy), albo
-//     – pierwszym dotknięciem ekranu startowego, gdy żaden scenariusz nie trwa (kolejny numer).
+//     – klawiszem prowadzącego 1, 2 lub 3 (start następnego scenariusza; kiosk wraca na ekran startowy), albo
+//     – pierwszym dotknięciem ekranu startowego, gdy żaden scenariusz nie trwa.
 //   Kończy się potwierdzeniem zamówienia (sukces = 1) albo klawiszem 0 prowadzącego (przerwanie, sukces = 0).
 // • Plik zapisuje się (dopisuje nowe wiersze) przy końcu scenariusza, przy anulowaniu zamówienia przez
 //   uczestnika („Zacznij od nowa”, upływ limitu czasu) i przy zamknięciu strony.
 
 import { useEffect, useRef } from 'react';
 import { useIsPresent } from 'framer-motion';
-
-const DEFAULTS = { interfejs: '6', uczestnik: 'P01', wersja: 'B' /* projekt interfejs_B */, kolejnosc: 'AB', scenariusz: 'S1' };
 
 const COLUMNS = [
   'interfejs', 'uczestnik', 'wersja', 'kolejnosc', 'scenariusz', 'czas_lokalny', 'czas_epoch_ms', 'czas_ms',
@@ -24,16 +24,15 @@ const COLUMNS = [
 // Po tylu ms od wejścia na ekran mierzymy położenie ekranu i AOI (po animacji wejścia)
 const SETTLE_MS = 1000;
 
-export { DEFAULTS };
-export const fileNameFor = (cfg) => `PUN_zdarzenia_I${String(cfg.interfejs).padStart(2, '0')}_${cfg.uczestnik}_${cfg.wersja}.csv`;
-
-let enabled = false; // rejestrujemy dopiero po zatwierdzeniu danych w panelu prowadzącego
+let enabled = false; // rejestrujemy dopiero po sprawdzeniu folderu zdarzenia/ przez serwer
 let meta = null;
-let fileName = '';
+let slot = null; // następny (albo bieżący) plik: { uczestnik, scenariusz } — przewidywany, serwer go potwierdza
+let file = null; // plik bieżącego scenariusza: { plik, uczestnik, kolejnosc, scenariusz }
+let reserving = null; // Promise<file | null> — tworzenie pliku na serwerze
+let fatalHandler = null;
 
 let rows = []; // wiersze jeszcze niezapisane do pliku
-let scenario = ''; // bieżący (albo ostatni) scenariusz; puste przed pierwszym startem
-let nextScenario = 1;
+let scenario = ''; // bieżący scenariusz
 let active = false; // czy trwa scenariusz
 let t0 = 0;
 
@@ -80,7 +79,7 @@ function push(fields, at = Date.now()) {
   if (!enabled) return {};
   const row = {
     ...meta,
-    scenariusz: scenario,
+    scenariusz: active ? scenario : '',
     czas_lokalny: localTime(at),
     czas_epoch_ms: at,
     czas_ms: active ? at - t0 : '',
@@ -254,7 +253,7 @@ const INTERACTIVE = 'button, a, input, select, textarea, [role="button"]';
 function onPointerDown(e) {
   if (!enabled) return;
   // Brak trwającego scenariusza + dotknięcie ekranu startowego → start kolejnego scenariusza
-  if (!active && base.name === 'start' && overlays.length === 0) startScenario(nextScenario, 'start=dotkniecie');
+  if (!active && base.name === 'start' && overlays.length === 0) startScenario('start=dotkniecie');
   const el = e.target.closest?.(INTERACTIVE);
   const aoiEl = e.target.closest?.('[data-aoi]');
   const disabled = Boolean(el?.disabled || el?.getAttribute?.('aria-disabled') === 'true');
@@ -271,16 +270,43 @@ function onPointerDown(e) {
 }
 
 // ---------- scenariusze ----------
-export function startScenario(n, opis = '') {
-  if (active) endScenario({ sukces: 0, opis: `przerwano=start_S${n}` });
+// S1 → S2 → S3 → następny uczestnik od S1 (ta sama reguła co na serwerze, serwer ma rozstrzygający głos)
+const following = ({ uczestnik, scenariusz }) => {
+  const p = Number(uczestnik.slice(1));
+  const s = Number(scenariusz.slice(1));
+  return s < 3 ? { uczestnik, scenariusz: `S${s + 1}` } : { uczestnik: `P${pad(p + 1)}`, scenariusz: 'S1' };
+};
+
+export function startScenario(opis = '') {
+  if (!enabled) return;
+  if (active) endScenario({ sukces: 0, opis: `przerwano=start_${following(slot).scenariusz}` });
   // AOI ekranu, który jeszcze kończy animację wejścia, należą do okresu przed scenariuszem —
   // zgłaszamy je teraz, zanim zmieni się numer scenariusza i t0 (inaczej dostałyby S{n} i ujemny czas_ms)
   completeSettle();
-  scenario = `S${n}`;
-  nextScenario = n + 1;
+  scenario = slot.scenariusz;
   active = true;
   t0 = Date.now();
   push({ zdarzenie: 'scenariusz_start', ekran: '', opis }, t0);
+  const job = requestFile(true)
+    .then((info) => {
+      const created = { plik: info.plik, uczestnik: info.uczestnik, kolejnosc: info.kolejnosc, scenariusz: info.scenariusz };
+      console.info(`[zdarzenia] scenariusz ${info.scenariusz}: zdarzenia/${info.plik}`);
+      if (reserving === job) {
+        file = created;
+        slot = { uczestnik: info.uczestnik, scenariusz: info.scenariusz };
+        setMeta(info);
+        scenario = info.scenariusz;
+      }
+      return created;
+    })
+    .catch((err) => {
+      enabled = false;
+      active = false;
+      console.error('[zdarzenia] nie utworzono pliku scenariusza', err);
+      fatalHandler?.(err);
+      return null;
+    });
+  reserving = job;
   if (resetHandler && !(base.name === 'start' && overlays.length === 0)) {
     resetHandler(); // kiosk wraca na ekran startowy, ekran zaloguje się sam
   } else {
@@ -293,8 +319,12 @@ export function endScenario({ sukces, opis = '' }) {
   if (!active) return;
   completeSettle();
   push({ zdarzenie: 'scenariusz_koniec', sukces, opis });
-  active = false;
   flush();
+  active = false;
+  // Kolejne wiersze należą już do następnego scenariusza (jego plik powstanie przy starcie)
+  file = null;
+  reserving = null;
+  slot = following(slot);
 }
 
 export const isActive = () => active;
@@ -313,15 +343,26 @@ function csvField(v) {
   return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-// Dopisuje niezapisane wiersze do pliku uczestnika (serwer Vite dodaje BOM i nagłówek przy nowym pliku)
+// Dopisuje niezapisane wiersze do pliku bieżącego scenariusza. Przed startem scenariusza wiersze czekają
+// na jego plik; gdy plik dopiero powstaje, zapis następuje po jego utworzeniu.
 export function flush({ beacon = false } = {}) {
   if (!enabled) return;
   completeSettle();
   measureAllNow();
   sortRows();
-  if (rows.length === 0) return;
-  const wiersze = rows.map((r) => COLUMNS.map((c) => csvField(r[c])).join(';')).join('\n') + '\n';
+  if (rows.length === 0 || !reserving) return;
+  const batch = rows;
   rows = [];
+  if (file) send(batch, file, beacon);
+  else reserving.then((f) => { if (f) send(batch, f); });
+}
+
+// Wszystkie wiersze pliku mają uczestnika, kolejność i scenariusz tego pliku
+function send(batch, f, beacon = false) {
+  const wiersze = batch
+    .map((r) => ({ ...r, uczestnik: f.uczestnik, kolejnosc: f.kolejnosc, scenariusz: r.scenariusz ? f.scenariusz : '' }))
+    .map((r) => COLUMNS.map((c) => csvField(r[c])).join(';')).join('\n') + '\n';
+  const fileName = f.plik;
   const body = JSON.stringify({ nazwa: fileName, naglowek: COLUMNS.join(';'), wiersze });
   if (beacon && navigator.sendBeacon) {
     navigator.sendBeacon('/api/zdarzenia', new Blob([body], { type: 'application/json' }));
@@ -341,50 +382,57 @@ export function flush({ beacon = false } = {}) {
     });
 }
 
-// ---------- sesja (panel prowadzącego) ----------
-// Start rejestrowania dla uczestnika: { interfejs, uczestnik, wersja, kolejnosc, scenariusz } → wiersz `sesja`
-export function configure(cfg) {
-  if (enabled) shutdown('panel');
-  meta = { interfejs: String(cfg.interfejs), uczestnik: cfg.uczestnik, wersja: cfg.wersja, kolejnosc: cfg.kolejnosc };
-  fileName = fileNameFor(cfg);
-  scenario = '';
-  nextScenario = Number(String(cfg.scenariusz).replace(/\D/g, '')) || 1;
-  active = false;
-  rows = [];
-  lastEkran = '';
-  tracked.clear();
-  pending.clear();
-  settle = null;
+// ---------- sesja ----------
+// rezerwuj = false: serwer sprawdza folder i podaje następny plik; rezerwuj = true: tworzy go.
+async function requestFile(rezerwuj) {
+  let res;
+  try {
+    res = await fetch('/api/zdarzenia/sesja', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ naglowek: COLUMNS.join(';'), rezerwuj }),
+    });
+  } catch {
+    throw new Error('Brak serwera zapisu zdarzeń. Uruchom kiosk przez „npm run dev” albo „npm run preview”.');
+  }
+  const info = await res.json().catch(() => ({}));
+  if (!res.ok || !info.plik) throw new Error(info.blad || `Serwer zapisu zdarzeń odpowiedział błędem HTTP ${res.status}.`);
+  return info;
+}
+
+function setMeta(info) {
+  meta = { interfejs: String(info.interfejs), uczestnik: info.uczestnik, wersja: info.wersja, kolejnosc: info.kolejnosc };
+}
+
+// Start kiosku: serwer sprawdza folder zdarzenia/ i podaje następny plik. Bez tego (brak serwera, brak dostępu
+// do folderu) rejestrowanie się nie zaczyna — błąd trafia do wywołującego.
+export async function startSession() {
+  if (enabled) return slot;
+  const info = await requestFile(false);
+  setMeta(info);
+  slot = { uczestnik: info.uczestnik, scenariusz: info.scenariusz };
   enabled = true;
   push({
     zdarzenie: 'sesja',
     ekran: '',
     opis: `skalowanie=${Math.round(window.devicePixelRatio * 100)}% okno=${window.innerWidth}x${window.innerHeight} ekran=${window.screen.width}x${window.screen.height}`,
   });
+  return info;
 }
 
-// Koniec rejestrowania (powrót do panelu): trwający scenariusz zostaje przerwany, reszta trafia do pliku
-export function shutdown(reason = 'panel') {
-  if (!enabled) return;
-  if (active) endScenario({ sukces: 0, opis: `przerwano=${reason}` });
-  else flush();
-  enabled = false;
-  overlays.length = 0;
-  base = { name: 'start', opis: '', el: null };
-  if (settle) clearTimeout(settle.timer);
-  settle = null;
-  tracked.clear();
-}
+// Błąd przy tworzeniu pliku scenariusza w trakcie sesji (rejestrowanie zostaje zatrzymane)
+export function onFatal(fn) { fatalHandler = fn; }
 
-export const currentFileName = () => fileName;
+export const currentFileName = () => file?.plik ?? '';
 
 document.addEventListener('pointerdown', onPointerDown, true);
 
-// Klawisze prowadzącego: 1–3 = start scenariusza S1–S3, 0 (albo Esc poza pełnym ekranem) = przerwanie scenariusza
+// Klawisze prowadzącego: 1–3 = start następnego scenariusza (numer S nadaje kolejność plików),
+// 0 (albo Esc poza pełnym ekranem) = przerwanie scenariusza
 window.addEventListener('keydown', (e) => {
   if (!enabled || e.ctrlKey || e.altKey || e.metaKey) return;
   if (e.target.closest?.('input, textarea')) return;
-  if (/^[1-3]$/.test(e.key)) startScenario(Number(e.key), 'start=prowadzacy');
+  if (/^[1-3]$/.test(e.key)) startScenario('start=prowadzacy');
   else if (e.key === '0' || e.key === 'Escape') endScenario({ sukces: 0, opis: 'przerwano=prowadzacy' });
 });
 

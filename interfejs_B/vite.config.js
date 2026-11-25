@@ -3,51 +3,106 @@ import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Folder na pliki CSV z rejestrem zdarzeń (jeden plik na uczestnika i wersję)
+// Folder na pliki CSV z rejestrem zdarzeń (jeden plik na uczestnika i scenariusz) — tylko pliki tej wersji
 const EVENTS_DIR = path.resolve(__dirname, 'zdarzenia');
+const INTERFEJS = '06';
+const WERSJA = 'B';
+const SCENARIUSZE = 3;
 
-// POST /api/zdarzenia  { nazwa, naglowek, wiersze } → dopisanie wierszy do zdarzenia/<nazwa>.
-// Nowy plik dostaje BOM (UTF-8 z BOM, jak w słowniku) i wiersz nagłówka.
+// Nazwa pliku: PUN_zdarzenia_I06_P<numer, min. 2 cyfry>_B_S<1–3>.csv
+const FILE_RE = new RegExp(`^PUN_zdarzenia_I${INTERFEJS}_P(\\d{2,})_${WERSJA}_S([1-${SCENARIUSZE}])\\.csv$`);
+const pCode = (p) => `P${String(p).padStart(2, '0')}`;
+const fileNameFor = (p, s) => `PUN_zdarzenia_I${INTERFEJS}_${pCode(p)}_${WERSJA}_S${s}.csv`;
+
+// Kolejność wersji w badaniu (metadane do kolumny kolejnosc): nieparzysty numer → AB, parzysty → BA.
+// Ta sama reguła w obu wersjach, więc uczestnik Pnn ma tę samą kolejność w plikach _A i _B.
+export const orderFor = (p) => (p % 2 === 1 ? 'AB' : 'BA');
+
+// Następny plik po najwyższym (P, S) w folderze zdarzenia/: S1 → S2 → S3, potem kolejny P od S1.
+// Luki nie są wypełniane, pliki o innej nazwie są pomijane.
+export function nextSlot(dir) {
+  let p = 0;
+  let s = SCENARIUSZE;
+  for (const name of fs.readdirSync(dir)) {
+    const m = FILE_RE.exec(name);
+    if (!m) continue;
+    const [mp, ms] = [Number(m[1]), Number(m[2])];
+    if (mp > p || (mp === p && ms > s)) [p, s] = [mp, ms];
+  }
+  if (s < SCENARIUSZE) s += 1;
+  else [p, s] = [p + 1, 1];
+  return {
+    plik: fileNameFor(p, s), uczestnik: pCode(p), scenariusz: `S${s}`,
+    interfejs: Number(INTERFEJS), wersja: WERSJA, kolejnosc: orderFor(p),
+  };
+}
+
+// rezerwuj = false: tylko sprawdzenie folderu i podgląd następnego pliku (start kiosku).
+// rezerwuj = true: utworzenie pliku (BOM + nagłówek) przy starcie scenariusza.
+// Flaga 'wx' — istniejący plik nigdy nie zostanie nadpisany; wtedy zgłaszamy błąd.
+export function nextFile(dir, naglowek, rezerwuj) {
+  fs.mkdirSync(dir, { recursive: true });
+  const slot = nextSlot(dir);
+  if (rezerwuj) fs.writeFileSync(path.join(dir, slot.plik), `\uFEFF${naglowek}\n`, { encoding: 'utf8', flag: 'wx' });
+  return slot;
+}
+
+const describe = (err) => {
+  const where = path.relative(__dirname, EVENTS_DIR);
+  if (err.code === 'EEXIST' && err.syscall === 'open') return `Plik ${path.basename(err.path)} już istnieje — nie nadpisano go. Odśwież stronę, aby nadać kolejny plik.`;
+  if (err.code === 'EACCES' || err.code === 'EPERM') return `Brak dostępu do folderu ${where}/ (${err.code}).`;
+  if (err.code === 'ENOTDIR') return `${where} nie jest folderem.`;
+  return `Nie można odczytać folderu ${where}/: ${err.message || err}`;
+};
+
+// POST /api/zdarzenia/sesja  { naglowek, rezerwuj } → { plik, uczestnik, scenariusz, interfejs, wersja, kolejnosc }
+// POST /api/zdarzenia        { nazwa, naglowek, wiersze } → dopisanie wierszy do zdarzenia/<nazwa>.
 function eventLogWriter() {
-  const safeName = (nazwa) => {
-    const base = path.basename(String(nazwa || 'PUN_zdarzenia.csv')).replace(/[^A-Za-z0-9_.-]/g, '_');
-    return base.endsWith('.csv') ? base : `${base}.csv`;
+  const readBody = (req) => new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => { try { resolve(JSON.parse(body)); } catch (err) { reject(err); } });
+    req.on('error', reject);
+  });
+  const send = (res, status, data) => {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(data));
   };
 
   const handler = (req, res, next) => {
     const url = new URL(req.url, 'http://localhost');
-    if (url.pathname !== '/api/zdarzenia') return next();
+    if (req.method !== 'POST') return next();
 
-    // GET /api/zdarzenia?nazwa=... → czy plik uczestnika już istnieje (panel prowadzącego)
-    if (req.method === 'GET') {
-      const file = path.join(EVENTS_DIR, safeName(url.searchParams.get('nazwa')));
-      const exists = fs.existsSync(file);
-      const lines = exists ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).length - 1 : 0;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ istnieje: exists, wiersze: Math.max(lines, 0), folder: path.relative(__dirname, EVENTS_DIR) }));
+    if (url.pathname === '/api/zdarzenia/sesja') {
+      readBody(req)
+        .then(({ naglowek, rezerwuj }) => {
+          if (typeof naglowek !== 'string') return send(res, 400, { blad: 'brak nagłówka' });
+          try {
+            send(res, 200, nextFile(EVENTS_DIR, naglowek, rezerwuj === true));
+          } catch (err) {
+            send(res, 500, { blad: describe(err) });
+          }
+        })
+        .catch((err) => send(res, 400, { blad: String(err.message || err) }));
       return;
     }
-    if (req.method !== 'POST') return next();
-    let body = '';
-    req.setEncoding('utf8');
-    req.on('data', (chunk) => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const { nazwa, naglowek, wiersze } = JSON.parse(body);
+
+    if (url.pathname !== '/api/zdarzenia') return next();
+    readBody(req)
+      .then(({ nazwa, naglowek, wiersze }) => {
         if (typeof wiersze !== 'string' || typeof naglowek !== 'string') throw new Error('brak danych');
-        // Tylko bezpieczne znaki w nazwie pliku, zawsze w folderze zdarzenia/
-        const name = safeName(nazwa);
+        // Tylko pliki tej wersji o właściwej nazwie, zawsze w folderze zdarzenia/
+        const name = path.basename(String(nazwa || ''));
+        if (!FILE_RE.test(name)) throw new Error(`niedozwolona nazwa pliku: ${name}`);
         fs.mkdirSync(EVENTS_DIR, { recursive: true });
         const file = path.join(EVENTS_DIR, name);
-        if (!fs.existsSync(file)) fs.writeFileSync(file, `﻿${naglowek}\n`, 'utf8');
+        if (!fs.existsSync(file)) fs.writeFileSync(file, `\uFEFF${naglowek}\n`, { encoding: 'utf8', flag: 'wx' });
         fs.appendFileSync(file, wiersze, 'utf8');
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ plik: path.relative(__dirname, file) }));
-      } catch (err) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ blad: String(err.message || err) }));
-      }
-    });
+        send(res, 200, { plik: path.relative(__dirname, file) });
+      })
+      .catch((err) => send(res, 400, { blad: String(err.message || err) }));
   };
   return {
     name: 'zapis-zdarzen',

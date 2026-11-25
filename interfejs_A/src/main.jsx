@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
-import AdminSetup from './admin/AdminSetup.jsx';
-import { configure, shutdown } from './logger.js';
+import { onFatal, startSession } from './logger.js';
 // Czcionka dołączona lokalnie (bez internetu) — stałe wymiary przycisków i współrzędne AOI w każdej sesji
 import '@fontsource/poppins/400.css';
 import '@fontsource/poppins/500.css';
@@ -11,41 +10,41 @@ import '@fontsource/poppins/700.css';
 import '@fontsource/poppins/800.css';
 import './styles.css';
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// Pełny ekran po otwarciu strony. Przeglądarka pozwala na to dopiero po geście użytkownika,
+// więc gdy pierwsza próba się nie uda, pełny ekran włącza się przy pierwszym dotknięciu / klawiszu
+// (i wraca po kolejnym dotknięciu, jeśli ktoś go wyłączył).
+const enterFullscreen = () => {
+  if (document.fullscreenElement || !document.fullscreenEnabled) return;
+  document.documentElement.requestFullscreen?.().catch(() => {});
+};
+enterFullscreen();
+window.addEventListener('pointerdown', enterFullscreen, true);
+window.addEventListener('keydown', (e) => { if (e.key !== 'F11' && e.key !== 'Escape') enterFullscreen(); }, true);
 
-// Najpierw panel prowadzącego (dane uczestnika), potem kiosk. Ctrl+Shift+A wraca do panelu.
-function Root() {
-  const [session, setSession] = useState(null);
+const root = ReactDOM.createRoot(document.getElementById('root'));
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if (!(e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a')) return;
-      e.preventDefault();
-      shutdown('panel');
-      setSession(null);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const start = async (cfg, fullscreen) => {
-    if (fullscreen && !document.fullscreenElement) {
-      try {
-        // Niektóre przeglądarki nie odpowiadają na prośbę o pełny ekran — po 1,5 s startujemy mimo to
-        await Promise.race([document.documentElement.requestFullscreen(), wait(1500)]);
-        await wait(400); // wiersz `sesja` ma mieć już rozmiar okna po przejściu na pełny ekran
-      } catch { /* przeglądarka odmówiła — działamy w oknie */ }
-    }
-    configure(cfg);
-    setSession({ ...cfg, startedAt: Date.now() });
-  };
-
-  return session ? <App key={session.startedAt} /> : <AdminSetup onStart={start} />;
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <Root />
-  </React.StrictMode>
+const showError = (err, note) => root.render(
+  <div role="alert" style={{ maxWidth: 640, margin: '15vh auto', padding: 24, fontFamily: 'Poppins, sans-serif', color: '#7a0010', background: '#fff0f0', border: '2px solid #da291c', borderRadius: 12 }}>
+    <h1 style={{ marginTop: 0, fontSize: 24 }}>Nie można rozpocząć rejestrowania zdarzeń</h1>
+    <p>{err.message}</p>
+    <p>{note} Usuń problem i odśwież stronę (F5).</p>
+  </div>
 );
+
+// Plik scenariusza nie powstał w trakcie sesji → kiosk znika, żeby nie prowadzić scenariusza bez zapisu
+onFatal((err) => showError(err, 'Nie utworzono pliku scenariusza — ten scenariusz nie został zapisany.'));
+
+// Kiosk startuje dopiero, gdy serwer sprawdzi folder zdarzenia/ i poda następny plik (P/S)
+startSession()
+  .then(({ plik }) => {
+    console.info(`[zdarzenia] następny plik: zdarzenia/${plik}`);
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+  })
+  .catch((err) => {
+    console.error('[zdarzenia] nie rozpoczęto sesji', err);
+    showError(err, 'Nie nadano numeru uczestnika i nie zapisano żadnego pliku.');
+  });
